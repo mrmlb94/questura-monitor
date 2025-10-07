@@ -7,7 +7,7 @@ from email.mime.multipart import MIMEMultipart
 import re
 
 def send_notification(subject, body):
-    """ارسال ایمیل نوتیفیکیشن"""
+    """Send email notification"""
     try:
         sender = os.environ.get('EMAIL_ADDRESS')
         password = os.environ.get('EMAIL_PASSWORD')
@@ -32,7 +32,7 @@ def send_notification(subject, body):
         return False
 
 def extract_status_text(html_content):
-    """استخراج متن وضعیت از HTML"""
+    """Extract status text from HTML"""
     patterns = [
         r'Residence permit position:\s*(.+?)(?:\.|<br|</)',
         r'Posizione permesso di soggiorno:\s*(.+?)(?:\.|<br|</)',
@@ -50,21 +50,15 @@ def extract_status_text(html_content):
             else:
                 text = match.group(0).strip()
             
-            # پاک کردن همه تگ‌های HTML
             text = re.sub(r'<[^>]+>', '', text)
-            # پاک کردن فضای خالی اضافی
             text = re.sub(r'\s+', ' ', text).strip()
             return text
     
     return None
 
-
-
-
 def check_permesso():
-    """بررسی وضعیت Permesso di Soggiorno"""
+    """Check Permesso di Soggiorno status"""
     
-    # دریافت شماره پرونده از environment variable
     pratica_number = os.environ.get('PRATICA_NUMBER')
     
     if not pratica_number:
@@ -76,9 +70,6 @@ def check_permesso():
         return
     
     url = f"https://questure.poliziadistato.it/stranieri/?lang=english&mime=1&pratica={pratica_number}&invia=Submit"
-    
-    # بقیه کد...
-
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -114,12 +105,9 @@ def check_permesso():
         content = response.text
         content_lower = content.lower()
         
-        # استخراج متن دقیق وضعیت
         status_text = extract_status_text(content)
         
-        # بررسی حالت‌های مختلف
         if "accesso negato" in content_lower or "bloccata" in content_lower:
-            # حالت 1: دسترسی مسدود شده
             print("❌ ACCESS BLOCKED by protection system")
             
             send_notification(
@@ -134,7 +122,6 @@ def check_permesso():
             "ready for delivery",
             "available for pickup"
         ]):
-            # حالت 2: آماده برای تحویل! 🎉
             print("🎉🎉🎉 PERMESSO IS READY FOR COLLECTION!")
             print(f"Status: {status_text if status_text else 'Ready!'}")
             
@@ -167,7 +154,6 @@ You may also receive an SMS with pickup instructions.
             "in corso",
             "processing"
         ]):
-            # حالت 3: در حال پردازش
             print("⏳ Permesso is still being processed")
             print(f"Current status: {status_text if status_text else 'Being processed'}")
             
@@ -177,9 +163,9 @@ You may also receive an SMS with pickup instructions.
 Your residence permit is still being processed.
 
 Current Status:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━
 {status_text if status_text else 'Residence permit is being processed'}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━
 
 📅 Checked at: {timestamp}
 
@@ -196,7 +182,6 @@ Next check: In a few hours...
             )
             
         else:
-            # حالت 4: وضعیت نامشخص
             print("ℹ️ Status checked - Unknown state")
             if status_text:
                 print(f"Found text: {status_text}")
@@ -207,9 +192,9 @@ Next check: In a few hours...
 Status checked successfully.
 
 Current Status:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━
 {status_text if status_text else 'Status information not clearly identified'}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━
 
 Time: {timestamp}
 
