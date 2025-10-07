@@ -1,6 +1,7 @@
 import requests
 import os
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -81,14 +82,15 @@ def check_permesso():
         'Referer': 'https://questure.poliziadistato.it/'
     }
     
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    italy_tz = ZoneInfo("Europe/Rome")
+    timestamp = datetime.now(italy_tz).strftime("%Y-%m-%d %H:%M:%S")
     
     try:
         response = requests.get(url, headers=headers, timeout=30)
         
         print(f"\n{'='*70}")
         print(f"🔍 Checking Permesso di Soggiorno Status")
-        print(f"Time: {timestamp}")
+        print(f"Time: {timestamp} (Italy)")
         print(f"HTTP Status: {response.status_code}")
         print(f"{'='*70}\n")
         
@@ -98,7 +100,7 @@ def check_permesso():
             
             send_notification(
                 f"⚠️ Permesso Check Error - {timestamp}",
-                f"Error checking Permesso status.\n\nHTTP Status: {response.status_code}\nTime: {timestamp}\nURL: {url}"
+                f"Error checking Permesso status.\n\nHTTP Status: {response.status_code}\nTime: {timestamp} (Italy Time)\nURL: {url}"
             )
             return
         
@@ -112,7 +114,7 @@ def check_permesso():
             
             send_notification(
                 f"🚫 Permesso Check - Access Blocked - {timestamp}",
-                f"⚠️ The website blocked the request.\n\nTime: {timestamp}\n\nTry checking manually:\n{url}"
+                f"⚠️ The website blocked the request.\n\nTime: {timestamp} (Italy Time)\n\nTry checking manually:\n{url}"
             )
             
         elif any(keyword in content_lower for keyword in [
@@ -133,7 +135,7 @@ Your residence permit is ready for collection!
 Current Status:
 {status_text if status_text else 'Ready for delivery'}
 
-Time: {timestamp}
+Time: {timestamp} (Italy Time)
 
 ⚡ GO TO QUESTURA TO PICK IT UP IMMEDIATELY!
 
@@ -167,7 +169,7 @@ Current Status:
 {status_text if status_text else 'Residence permit is being processed'}
 ━━━━━━━━━━━━━━━━━━━
 
-📅 Checked at: {timestamp}
+📅 Checked at: {timestamp} (Italy Time)
 
 ✋ You need to wait. The permit is not ready yet.
 
@@ -196,7 +198,7 @@ Current Status:
 {status_text if status_text else 'Status information not clearly identified'}
 ━━━━━━━━━━━━━━━━━━━
 
-Time: {timestamp}
+Time: {timestamp} (Italy Time)
 
 ⚠️ The exact status could not be determined.
 You may want to check manually at:
@@ -214,21 +216,21 @@ Next automatic check: In a few hours...
         print("⏱️ Request timeout")
         send_notification(
             f"⏱️ Permesso Check Timeout - {timestamp}",
-            f"Request timeout while checking.\n\nTime: {timestamp}\nURL: {url}"
+            f"Request timeout while checking.\n\nTime: {timestamp} (Italy Time)\nURL: {url}"
         )
         
     except requests.exceptions.ConnectionError:
         print("🔌 Connection error")
         send_notification(
             f"🔌 Permesso Connection Error - {timestamp}",
-            f"Connection error.\n\nTime: {timestamp}\nURL: {url}"
+            f"Connection error.\n\nTime: {timestamp} (Italy Time)\nURL: {url}"
         )
         
     except Exception as e:
         print(f"❌ Error: {str(e)}")
         send_notification(
             f"❌ Permesso Check Error - {timestamp}",
-            f"Error occurred:\n{str(e)}\n\nTime: {timestamp}\nURL: {url}"
+            f"Error occurred:\n{str(e)}\n\nTime: {timestamp} (Italy Time)\nURL: {url}"
         )
 
 if __name__ == "__main__":
