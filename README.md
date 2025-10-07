@@ -34,7 +34,7 @@ Click the **"Fork"** button at the top right of this page to create your own cop
 
 ### Step 2: Get Your Pratica Number
 
-Find your **10-digit pratica number** on your Questura receipt. It looks like: `0595519999`
+Find your **10-digit pratica number** on your Questura receipt. It looks like: `0123456789`
 
 ### Step 3: Generate Gmail App Password
 
