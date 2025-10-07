@@ -3,8 +3,9 @@ import os
 from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
-def send_notification(message):
+def send_notification(subject, body):
     """ارسال ایمیل نوتیفیکیشن"""
     try:
         sender = os.environ.get('EMAIL_ADDRESS')
@@ -12,19 +13,22 @@ def send_notification(message):
         
         if not sender or not password:
             print("⚠️ Email credentials not set")
-            return
+            return False
         
-        msg = MIMEText(message)
-        msg['Subject'] = '🎉 Questura Status Changed!'
+        msg = MIMEMultipart()
+        msg['Subject'] = subject
         msg['From'] = sender
         msg['To'] = sender
+        msg.attach(MIMEText(body, 'plain'))
         
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(sender, password)
             server.send_message(msg)
         print("✅ Email sent successfully!")
+        return True
     except Exception as e:
         print(f"❌ Email error: {e}")
+        return False
 
 def check_questura():
     """بررسی وضعیت سایت Questura"""
@@ -39,9 +43,10 @@ def check_questura():
         'Upgrade-Insecure-Requests': '1'
     }
     
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
     try:
         response = requests.get(url, headers=headers, timeout=30)
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         print(f"\n{'='*60}")
         print(f"Check at: {timestamp}")
@@ -49,35 +54,79 @@ def check_questura():
         print(f"{'='*60}")
         
         if response.status_code != 200:
-            print(f"❌ Error: HTTP {response.status_code}")
+            status = "❌ Error"
+            message = f"HTTP {response.status_code}"
+            print(f"{status}: {message}")
+            
+            # ارسال ایمیل برای خطا
+            send_notification(
+                f"⚠️ Questura Check Error - {timestamp}",
+                f"Error checking Questura website.\n\nHTTP Status: {response.status_code}\nTime: {timestamp}\nURL: {url}"
+            )
             return
         
         content = response.text.lower()
         
-        # بررسی محتوا
+        # بررسی محتوا و تعیین وضعیت
         if "accesso negato" in content or "bloccata" in content:
-            print("❌ Access is BLOCKED by protection system")
+            status = "❌ BLOCKED"
+            emoji = "🚫"
+            message = "Access is BLOCKED by protection system"
+            print(message)
+            
+            # ایمیل برای حالت مسدود
+            send_notification(
+                f"{emoji} Questura Check - BLOCKED - {timestamp}",
+                f"Status: Access Blocked\n\nThe website protection system blocked the request.\nTime: {timestamp}\nURL: {url}"
+            )
+            
         elif "disponibil" in content or "available" in content:
-            message = f"""
-🎉 QUESTURA SLOT AVAILABLE! 🎉
-
-Time: {timestamp}
-Link: {url}
-
-Check immediately!
-            """
-            print("✅✅✅ SLOT AVAILABLE!")
-            print("Sending notification...")
-            send_notification(message)
+            status = "✅ AVAILABLE"
+            emoji = "🎉"
+            message = "SLOT IS AVAILABLE!"
+            print(f"✅✅✅ {message}")
+            
+            # ایمیل فوری برای اسلات موجود
+            send_notification(
+                f"{emoji} QUESTURA SLOT AVAILABLE! - {timestamp}",
+                f"🎉🎉🎉 SLOT IS AVAILABLE! 🎉🎉🎉\n\nTime: {timestamp}\nURL: {url}\n\n⚡ CHECK IMMEDIATELY!"
+            )
+            
         else:
-            print("ℹ️  No changes detected")
+            status = "ℹ️ No Change"
+            emoji = "✓"
+            message = "No changes detected - website is accessible"
+            print(f"ℹ️  {message}")
+            
+            # ایمیل برای وضعیت عادی
+            send_notification(
+                f"{emoji} Questura Daily Check - {timestamp}",
+                f"Status: OK - No changes\n\nWebsite checked successfully.\nNo slots available yet.\nTime: {timestamp}\nURL: {url}\n\nNext check in a few hours..."
+            )
             
     except requests.exceptions.Timeout:
-        print("⏱️  Request timeout")
+        message = "Request timeout"
+        print(f"⏱️  {message}")
+        send_notification(
+            f"⏱️ Questura Check Timeout - {timestamp}",
+            f"Request timeout while checking website.\n\nTime: {timestamp}\nURL: {url}"
+        )
+        
     except requests.exceptions.ConnectionError:
-        print("🔌 Connection error")
+        message = "Connection error"
+        print(f"🔌 {message}")
+        send_notification(
+            f"🔌 Questura Connection Error - {timestamp}",
+            f"Connection error while checking website.\n\nTime: {timestamp}\nURL: {url}"
+        )
+        
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
+        message = str(e)
+        print(f"❌ Error: {message}")
+        send_notification(
+            f"❌ Questura Check Error - {timestamp}",
+            f"Unexpected error occurred.\n\nError: {message}\nTime: {timestamp}\nURL: {url}"
+        )
 
 if __name__ == "__main__":
     print("🔍 Starting Questura Monitor...")
