@@ -33,7 +33,6 @@ def send_notification(subject, body):
 
 def extract_status_text(html_content):
     """استخراج متن وضعیت از HTML"""
-    # جستجو برای متن‌های مختلف وضعیت
     patterns = [
         r'Residence permit position:\s*(.+?)(?:\.|<br|</)',
         r'Posizione permesso di soggiorno:\s*(.+?)(?:\.|<br|</)',
@@ -47,11 +46,18 @@ def extract_status_text(html_content):
         match = re.search(pattern, html_content, re.IGNORECASE | re.DOTALL)
         if match:
             if match.groups():
-                return match.group(1).strip()
+                text = match.group(1).strip()
             else:
-                return match.group(0).strip()
+                text = match.group(0).strip()
+            
+            # پاک کردن همه تگ‌های HTML
+            text = re.sub(r'<[^>]+>', '', text)
+            # پاک کردن فضای خالی اضافی
+            text = re.sub(r'\s+', ' ', text).strip()
+            return text
     
     return None
+
 
 def check_permesso():
     """بررسی وضعیت Permesso di Soggiorno"""
