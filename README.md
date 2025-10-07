@@ -56,7 +56,7 @@ Find your **10-digit pratica number** on your Questura receipt. It looks like: `
 |------------|-------------|---------|
 | `EMAIL_ADDRESS` | Your Gmail address | `your.email@gmail.com` |
 | `EMAIL_PASSWORD` | Gmail App Password (no spaces) | `abcdefghijklmnop` |
-| `PRATICA_NUMBER` | Your 10-digit Questura number | `0595519999` |
+| `PRATICA_NUMBER` | Your 10-digit Questura number | `0123456789` |
 
 ### Step 5: Enable GitHub Actions
 
