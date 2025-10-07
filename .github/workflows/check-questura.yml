@@ -2,10 +2,8 @@ name: Check Questura Daily
 
 on:
   schedule:
-    # هر روز ساعت 6 صبح و 6 عصر UTC (8 صبح و 8 شب CEST)
     - cron: '0 6,18 * * *'
   
-  # برای تست دستی
   workflow_dispatch:
 
 jobs:
@@ -30,5 +28,6 @@ jobs:
       env:
         EMAIL_ADDRESS: ${{ secrets.EMAIL_ADDRESS }}
         EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        PRATICA_NUMBER: ${{ secrets.PRATICA_NUMBER }}
       run: |
         python checker.py
