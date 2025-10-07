@@ -1,6 +1,7 @@
 # Questura Monitor
 
 🤖 Automatic daily checker for Italian Questura (Police) website
+[![Check Questura Daily](https://github.com/mrmlb94/questura-monitor/actions/workflows/check-questura.yml/badge.svg)](https://github.com/mrmlb94/questura-monitor/actions/workflows/check-questura.yml)
 
 ## Features
 
