@@ -59,9 +59,26 @@ def extract_status_text(html_content):
     return None
 
 
+
+
 def check_permesso():
     """بررسی وضعیت Permesso di Soggiorno"""
-    url = "https://questure.poliziadistato.it/stranieri/?lang=english&mime=1&pratica=059551999909&invia=Submit"
+    
+    # دریافت شماره پرونده از environment variable
+    pratica_number = os.environ.get('PRATICA_NUMBER')
+    
+    if not pratica_number:
+        print("❌ Error: PRATICA_NUMBER not set in Secrets!")
+        send_notification(
+            "⚠️ Configuration Error",
+            "PRATICA_NUMBER is not configured. Please add it to GitHub Secrets."
+        )
+        return
+    
+    url = f"https://questure.poliziadistato.it/stranieri/?lang=english&mime=1&pratica={pratica_number}&invia=Submit"
+    
+    # بقیه کد...
+
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
