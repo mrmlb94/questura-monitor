@@ -34,15 +34,29 @@ def send_notification(subject, body):
 
 def extract_status_text(html_content):
     """Extract status text from HTML"""
+    # NEW PATTERNS that match your actual website
     patterns = [
+        r'residence permit.*?ready.*?collect[^\.]*\.',
+        r'residence permit.*?pronto[^\.]*\.',
+        r'is ready[^\.]*\.',
         r'Residence permit position:\s*(.+?)(?:\.|<br|</)',
         r'Posizione permesso di soggiorno:\s*(.+?)(?:\.|<br|</)',
-        r'Il documento di soggiorno.*?(?:pronto|consegna)',
         r'residence permit is being processed',
         r'is ready for collection',
         r'pronto per la consegna'
     ]
     
+    content_lower = html_content.lower()
+    
+    # Check for READY status first (most important)
+    if 'your residence permit is ready' in content_lower:
+        return "Your residence permit is ready. You will be informed by SMS when and where you can collect it."
+    
+    # Check for processing status
+    if 'residence permit is being processed' in content_lower:
+        return "Residence permit is being processed."
+    
+    # Try regex patterns
     for pattern in patterns:
         match = re.search(pattern, html_content, re.IGNORECASE | re.DOTALL)
         if match:
@@ -108,22 +122,16 @@ def check_permesso():
         content_lower = content.lower()
         
         status_text = extract_status_text(content)
+        print(f"DEBUG - Extracted status: {status_text}")  # DEBUG LINE
         
         if "accesso negato" in content_lower or "bloccata" in content_lower:
             print("❌ ACCESS BLOCKED by protection system")
-            
             send_notification(
                 f"🚫 Permesso Check - Access Blocked - {timestamp}",
                 f"⚠️ The website blocked the request.\n\nTime: {timestamp} (Italy Time)\n\nTry checking manually:\n{url}"
             )
             
-        elif any(keyword in content_lower for keyword in [
-            "ready for collection",
-            "pronto per la consegna",
-            "è pronto",
-            "ready for delivery",
-            "available for pickup"
-        ]):
+        elif "your residence permit is ready" in content_lower or "ready" in (status_text.lower() if status_text else ""):
             print("🎉🎉🎉 PERMESSO IS READY FOR COLLECTION!")
             print(f"Status: {status_text if status_text else 'Ready!'}")
             
@@ -137,7 +145,8 @@ Current Status:
 
 Time: {timestamp} (Italy Time)
 
-⚡ GO TO QUESTURA TO PICK IT UP IMMEDIATELY!
+⚡ GO TO QUESTURA LECCO TO PICK IT UP IMMEDIATELY!
+UFFICIO IMMIGRAZIONE PRESSO UFFICIO STRANIERI POLIZIA - LECCO
 
 Check details at:
 {url}
@@ -150,12 +159,7 @@ You may also receive an SMS with pickup instructions.
                 email_body
             )
             
-        elif any(keyword in content_lower for keyword in [
-            "being processed",
-            "in lavorazione",
-            "in corso",
-            "processing"
-        ]):
+        elif "being processed" in (content_lower or "") or "in lavorazione" in content_lower:
             print("⏳ Permesso is still being processed")
             print(f"Current status: {status_text if status_text else 'Being processed'}")
             
@@ -173,7 +177,7 @@ Current Status:
 
 ✋ You need to wait. The permit is not ready yet.
 
-We will notify you as soon as the status changes to "ready for collection".
+We will notify you as soon as it's READY FOR COLLECTION.
 
 Next check: In a few hours...
             """
