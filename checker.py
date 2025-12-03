@@ -126,20 +126,22 @@ def check_permesso():
     """Check ALL Permesso di Soggiorno statuses"""
     
     # Get ALL pratica numbers (supports multiple)
-    pratica_numbers = [
+    pratica_numbers_raw = [
         os.environ.get('PRATICA_NUMBER_1'),
         os.environ.get('PRATICA_NUMBER_2'),
-        os.environ.get('PRATICA_NUMBER_3')  # Add more if needed
+        os.environ.get('PRATICA_NUMBER_3')
     ]
     
-    # Filter out empty ones
-    pratica_numbers = [p for p in pratica_numbers if p]
+    # FIXED: Strip whitespace AND filter empty
+    pratica_numbers = [p.strip() for p in pratica_numbers_raw if p and p.strip()]
+    
+    print(f"🔍 Found {len(pratica_numbers)} valid pratiche: {pratica_numbers}")
     
     if not pratica_numbers:
-        print("❌ Error: No PRATICA_NUMBER_* set in Secrets!")
+        print("❌ No valid PRATICA_NUMBER_* secrets found!")
         send_notification(
             "⚠️ Configuration Error",
-            "No PRATICA_NUMBER_1, PRATICA_NUMBER_2, or PRATICA_NUMBER_3 configured.\nPlease add at least one to GitHub Secrets."
+            "No PRATICA_NUMBER_1, PRATICA_NUMBER_2, or PRATICA_NUMBER_3 configured with valid numbers.\n\n✅ Secrets exist but contain empty/whitespace values.\n\nFix: Edit secrets and ensure they contain actual numbers like '059551999909'"
         )
         return
     
@@ -164,10 +166,9 @@ def check_permesso():
     
     # Build single email with ALL results
     email_lines = []
-    ready_lines = []
     
     for result in results:
-        status_emoji = result['status'][0] if result['status'] else 'ℹ️'
+        status_emoji = result['status'][0] if result['status'] and result['status'][0] in '✅⏳❌🚫⏱️' else 'ℹ️'
         email_lines.append(f"{status_emoji} **{result['pratica']}**: {result['status']}")
         if result.get('url'):
             email_lines.append(f"   🔗 {result['url']}")
@@ -181,7 +182,6 @@ def check_permesso():
 {'='*50}
 📋 ALL STATUS UPDATES:
 {'='*50}
-
 """
         body += "\n".join(email_lines)
         body += f"""
@@ -190,10 +190,7 @@ def check_permesso():
 {'='*50}
 
 Time: {timestamp} (Italy Time)
-
-You may also receive SMS notifications.
         """
-        
     else:
         subject = f"⏳ Permesso Status Update - {timestamp}"
         body = f"""⏳ Permesso di Soggiorno Status Check
@@ -201,7 +198,6 @@ You may also receive SMS notifications.
 {'='*50}
 📋 ALL PRACTICA STATUS:
 {'='*50}
-
 """
         body += "\n".join(email_lines)
         body += f"""
@@ -209,9 +205,7 @@ You may also receive SMS notifications.
 📅 Checked: {timestamp} (Italy Time)
 {'='*50}
 
-✋ No permits ready yet. We will notify when READY!
-
-Next check: In a few hours...
+✋ No permits ready yet. Next check soon!
         """
     
     send_notification(subject, body)
