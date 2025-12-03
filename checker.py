@@ -34,7 +34,6 @@ def send_notification(subject, body):
 
 def extract_status_text(html_content):
     """Extract status text from HTML"""
-    # NEW PATTERNS that match your actual website
     patterns = [
         r'residence permit.*?ready.*?collect[^\.]*\.',
         r'residence permit.*?pronto[^\.]*\.',
@@ -48,15 +47,12 @@ def extract_status_text(html_content):
     
     content_lower = html_content.lower()
     
-    # Check for READY status first (most important)
     if 'your residence permit is ready' in content_lower:
-        return "Your residence permit is ready. You will be informed by SMS when and where you can collect it."
+        return "✅ READY - You will be informed by SMS when and where you can collect it."
     
-    # Check for processing status
     if 'residence permit is being processed' in content_lower:
-        return "Residence permit is being processed."
+        return "⏳ PROCESSING - Residence permit is being processed."
     
-    # Try regex patterns
     for pattern in patterns:
         match = re.search(pattern, html_content, re.IGNORECASE | re.DOTALL)
         if match:
@@ -69,21 +65,10 @@ def extract_status_text(html_content):
             text = re.sub(r'\s+', ' ', text).strip()
             return text
     
-    return None
+    return "ℹ️ UNKNOWN - Status information not clearly identified"
 
-def check_permesso():
-    """Check Permesso di Soggiorno status"""
-    
-    pratica_number = os.environ.get('PRATICA_NUMBER')
-    
-    if not pratica_number:
-        print("❌ Error: PRATICA_NUMBER not set in Secrets!")
-        send_notification(
-            "⚠️ Configuration Error",
-            "PRATICA_NUMBER is not configured. Please add it to GitHub Secrets."
-        )
-        return
-    
+def check_single_permesso(pratica_number, italy_tz):
+    """Check single pratica status"""
     url = f"https://questure.poliziadistato.it/stranieri/?lang=english&mime=1&pratica={pratica_number}&invia=Submit"
     
     headers = {
@@ -96,148 +81,143 @@ def check_permesso():
         'Referer': 'https://questure.poliziadistato.it/'
     }
     
-    italy_tz = ZoneInfo("Europe/Rome")
-    timestamp = datetime.now(italy_tz).strftime("%Y-%m-%d %H:%M:%S")
-    
     try:
         response = requests.get(url, headers=headers, timeout=30)
         
-        print(f"\n{'='*70}")
-        print(f"🔍 Checking Permesso di Soggiorno Status")
-        print(f"Time: {timestamp} (Italy)")
-        print(f"HTTP Status: {response.status_code}")
-        print(f"{'='*70}\n")
-        
         if response.status_code != 200:
-            message = f"⚠️ Error: HTTP {response.status_code}"
-            print(message)
-            
-            send_notification(
-                f"⚠️ Permesso Check Error - {timestamp}",
-                f"Error checking Permesso status.\n\nHTTP Status: {response.status_code}\nTime: {timestamp} (Italy Time)\nURL: {url}"
-            )
-            return
+            return {
+                'pratica': pratica_number,
+                'status': f"❌ ERROR - HTTP {response.status_code}",
+                'url': url
+            }
         
         content = response.text
         content_lower = content.lower()
         
-        status_text = extract_status_text(content)
-        print(f"DEBUG - Extracted status: {status_text}")  # DEBUG LINE
-        
         if "accesso negato" in content_lower or "bloccata" in content_lower:
-            print("❌ ACCESS BLOCKED by protection system")
-            send_notification(
-                f"🚫 Permesso Check - Access Blocked - {timestamp}",
-                f"⚠️ The website blocked the request.\n\nTime: {timestamp} (Italy Time)\n\nTry checking manually:\n{url}"
-            )
-            
-        elif "your residence permit is ready" in content_lower or "ready" in (status_text.lower() if status_text else ""):
-            print("🎉🎉🎉 PERMESSO IS READY FOR COLLECTION!")
-            print(f"Status: {status_text if status_text else 'Ready!'}")
-            
-            email_body = f"""
-🎉🎉🎉 PERMESSO DI SOGGIORNO IS READY! 🎉🎉🎉
+            return {
+                'pratica': pratica_number,
+                'status': "🚫 BLOCKED - Access denied by website",
+                'url': url
+            }
+        
+        status_text = extract_status_text(content)
+        return {
+            'pratica': pratica_number,
+            'status': status_text,
+            'url': url,
+            'is_ready': 'ready' in status_text.lower()
+        }
+        
+    except requests.exceptions.Timeout:
+        return {
+            'pratica': pratica_number,
+            'status': "⏱️ TIMEOUT - Request timeout",
+            'url': url
+        }
+    except Exception as e:
+        return {
+            'pratica': pratica_number,
+            'status': f"❌ EXCEPTION - {str(e)}",
+            'url': url
+        }
 
-Your residence permit is ready for collection!
+def check_permesso():
+    """Check ALL Permesso di Soggiorno statuses"""
+    
+    # Get ALL pratica numbers (supports multiple)
+    pratica_numbers = [
+        os.environ.get('PRATICA_NUMBER_1'),
+        os.environ.get('PRATICA_NUMBER_2'),
+        os.environ.get('PRATICA_NUMBER_3')  # Add more if needed
+    ]
+    
+    # Filter out empty ones
+    pratica_numbers = [p for p in pratica_numbers if p]
+    
+    if not pratica_numbers:
+        print("❌ Error: No PRATICA_NUMBER_* set in Secrets!")
+        send_notification(
+            "⚠️ Configuration Error",
+            "No PRATICA_NUMBER_1, PRATICA_NUMBER_2, or PRATICA_NUMBER_3 configured.\nPlease add at least one to GitHub Secrets."
+        )
+        return
+    
+    italy_tz = ZoneInfo("Europe/Rome")
+    timestamp = datetime.now(italy_tz).strftime("%Y-%m-%d %H:%M:%S")
+    
+    print(f"\n{'='*70}")
+    print(f"🔍 Checking {len(pratica_numbers)} Permesso(s)")
+    print(f"Time: {timestamp} (Italy)")
+    print(f"Pratiche: {', '.join(pratica_numbers)}")
+    print(f"{'='*70}\n")
+    
+    # Check all pratiche
+    results = []
+    any_ready = False
+    for pratica in pratica_numbers:
+        result = check_single_permesso(pratica, italy_tz)
+        results.append(result)
+        if result.get('is_ready'):
+            any_ready = True
+        print(f"📋 {pratica}: {result['status']}")
+    
+    # Build single email with ALL results
+    email_lines = []
+    ready_lines = []
+    
+    for result in results:
+        status_emoji = result['status'][0] if result['status'] else 'ℹ️'
+        email_lines.append(f"{status_emoji} **{result['pratica']}**: {result['status']}")
+        if result.get('url'):
+            email_lines.append(f"   🔗 {result['url']}")
+        email_lines.append("")  # Empty line
+    
+    # Determine email type
+    if any_ready:
+        subject = f"🎉 PERMESSO READY! ({timestamp})"
+        body = f"""🎉🎉🎉 AT LEAST ONE PERMESSO IS READY! 🎉🎉🎉
 
-Current Status:
-{status_text if status_text else 'Ready for delivery'}
+{'='*50}
+📋 ALL STATUS UPDATES:
+{'='*50}
+
+"""
+        body += "\n".join(email_lines)
+        body += f"""
+{'='*50}
+⚡ GO TO QUESTURA IMMEDIATELY! ⚡
+{'='*50}
 
 Time: {timestamp} (Italy Time)
 
-⚡ GO TO QUESTURA LECCO TO PICK IT UP IMMEDIATELY!
-UFFICIO IMMIGRAZIONE PRESSO UFFICIO STRANIERI POLIZIA - LECCO
+You may also receive SMS notifications.
+        """
+        
+    else:
+        subject = f"⏳ Permesso Status Update - {timestamp}"
+        body = f"""⏳ Permesso di Soggiorno Status Check
 
-Check details at:
-{url}
+{'='*50}
+📋 ALL PRACTICA STATUS:
+{'='*50}
 
-You may also receive an SMS with pickup instructions.
-            """
-            
-            send_notification(
-                f"🎉 PERMESSO READY! - {timestamp}",
-                email_body
-            )
-            
-        elif "being processed" in (content_lower or "") or "in lavorazione" in content_lower:
-            print("⏳ Permesso is still being processed")
-            print(f"Current status: {status_text if status_text else 'Being processed'}")
-            
-            email_body = f"""
-⏳ Permesso Status Update
+"""
+        body += "\n".join(email_lines)
+        body += f"""
+{'='*50}
+📅 Checked: {timestamp} (Italy Time)
+{'='*50}
 
-Your residence permit is still being processed.
-
-Current Status:
-━━━━━━━━━━━━━━━━━━━
-{status_text if status_text else 'Residence permit is being processed'}
-━━━━━━━━━━━━━━━━━━━
-
-📅 Checked at: {timestamp} (Italy Time)
-
-✋ You need to wait. The permit is not ready yet.
-
-We will notify you as soon as it's READY FOR COLLECTION.
+✋ No permits ready yet. We will notify when READY!
 
 Next check: In a few hours...
-            """
-            
-            send_notification(
-                f"⏳ Permesso Status - Still Processing - {timestamp}",
-                email_body
-            )
-            
-        else:
-            print("ℹ️ Status checked - Unknown state")
-            if status_text:
-                print(f"Found text: {status_text}")
-            
-            email_body = f"""
-ℹ️ Permesso Status Check
-
-Status checked successfully.
-
-Current Status:
-━━━━━━━━━━━━━━━━━━━
-{status_text if status_text else 'Status information not clearly identified'}
-━━━━━━━━━━━━━━━━━━━
-
-Time: {timestamp} (Italy Time)
-
-⚠️ The exact status could not be determined.
-You may want to check manually at:
-{url}
-
-Next automatic check: In a few hours...
-            """
-            
-            send_notification(
-                f"ℹ️ Permesso Status - Checked - {timestamp}",
-                email_body
-            )
-            
-    except requests.exceptions.Timeout:
-        print("⏱️ Request timeout")
-        send_notification(
-            f"⏱️ Permesso Check Timeout - {timestamp}",
-            f"Request timeout while checking.\n\nTime: {timestamp} (Italy Time)\nURL: {url}"
-        )
-        
-    except requests.exceptions.ConnectionError:
-        print("🔌 Connection error")
-        send_notification(
-            f"🔌 Permesso Connection Error - {timestamp}",
-            f"Connection error.\n\nTime: {timestamp} (Italy Time)\nURL: {url}"
-        )
-        
-    except Exception as e:
-        print(f"❌ Error: {str(e)}")
-        send_notification(
-            f"❌ Permesso Check Error - {timestamp}",
-            f"Error occurred:\n{str(e)}\n\nTime: {timestamp} (Italy Time)\nURL: {url}"
-        )
+        """
+    
+    send_notification(subject, body)
+    print("\n✓ All checks completed & email sent!")
 
 if __name__ == "__main__":
-    print("🔍 Starting Permesso di Soggiorno Monitor...")
+    print("🔍 Starting Multi-Permesso Monitor...")
     check_permesso()
-    print("\n✓ Check completed!")
+    print("\n✓ Done!")
